@@ -394,6 +394,9 @@ export default function DashboardApp() {
       if (!list.some(item => item.event_id === 'independence-day')) {
         list = [...list, { event_id: 'independence-day', event_name: 'Independence Day Virtual Challenge', release_date: null }];
       }
+      if (!list.some(item => item.event_id === 'sports-day')) {
+        list = [...list, { event_id: 'sports-day', event_name: 'National Sports Day Virtual Challenge', release_date: null }];
+      }
       setEventSettings(list);
     } catch (err) {
       console.error('Error fetching event settings:', err);
