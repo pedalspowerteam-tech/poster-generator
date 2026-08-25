@@ -45,6 +45,8 @@ import baackgroundimg from '../assets/baackgroundimg.png';
 import independenceDayBg from '../assets/independence_day_bg.jpg';
 // @ts-ignore
 import independenceDayCyclingBg from '../assets/independence_day_cycling_bg.jpg';
+// @ts-ignore
+import sportsDayBg from '../assets/sports_day_bg.jpg';
 
 
 interface DropdownProps {
@@ -331,6 +333,7 @@ function PosterGenerator() {
   const [loadedYouthDayBg, setLoadedYouthDayBg] = useState<HTMLImageElement | null>(null);
   const [loadedIndependenceDayBg, setLoadedIndependenceDayBg] = useState<HTMLImageElement | null>(null);
   const [loadedIndependenceDayCyclingBg, setLoadedIndependenceDayCyclingBg] = useState<HTMLImageElement | null>(null);
+  const [loadedSportsDayBg, setLoadedSportsDayBg] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
     const img = new Image();
@@ -368,6 +371,12 @@ function PosterGenerator() {
     img6.onload = () => {
       setLoadedIndependenceDayCyclingBg(img6);
     };
+
+    const img7 = new Image();
+    img7.src = sportsDayBg;
+    img7.onload = () => {
+      setLoadedSportsDayBg(img7);
+    };
   }, []);
 
   // Primary unified form state
@@ -378,13 +387,14 @@ function PosterGenerator() {
     const eventParam = new URLSearchParams(search).get('event');
     const isYouthDay = eventParam === 'youth-day';
     const isIndependenceDay = eventParam === 'independence-day';
+    const isSportsDay = eventParam === 'sports-day' || eventParam === 'sports_day';
     
     return {
       name: '',
-      date: '2026-01-26',
+      date: '2026-08-29',
       target: 'Select Target',
       photoUrl: null,
-      templateId: isIndependenceDay ? 'independence-day' : isYouthDay ? 'youth-day' : 'cycling-challenge',
+      templateId: isSportsDay ? 'sports-day' : isIndependenceDay ? 'independence-day' : isYouthDay ? 'youth-day' : 'cycling-challenge',
       photoX: 0,
       photoY: 0,
       photoScale: 1.0,
@@ -462,14 +472,17 @@ function PosterGenerator() {
       const eventParam = new URLSearchParams(search).get('event');
       const isYouthDay = eventParam === 'youth-day';
       const isIndependenceDay = eventParam === 'independence-day';
+      const isSportsDay = eventParam === 'sports-day' || eventParam === 'sports_day';
       
       setState(prev => {
         const nextRoute = isWalkRunning ? 'walk-runing' as const : 'cycling' as const;
-        const nextTemplateId = isIndependenceDay 
+        const nextTemplateId = isSportsDay
+          ? 'sports-day'
+          : isIndependenceDay 
           ? 'independence-day' 
           : isYouthDay 
           ? 'youth-day' 
-          : (prev.templateId === 'youth-day' || prev.templateId === 'independence-day' ? 'cycling-challenge' : prev.templateId);
+          : (prev.templateId === 'youth-day' || prev.templateId === 'independence-day' || prev.templateId === 'sports-day' ? 'cycling-challenge' : prev.templateId);
         
         if (prev.activityRoute !== nextRoute || prev.templateId !== nextTemplateId) {
           return {
@@ -488,12 +501,12 @@ function PosterGenerator() {
   // Redraw both canvases instantly when state, loadedPhoto, dragging state, or step/view state changes
   useEffect(() => {
     if (desktopCanvasRef.current) {
-      renderPoster(desktopCanvasRef.current, state, loadedPhoto, loadedCyclingBg, loadedRunWalkBg, isDragging, loadedHalftone, loadedYouthDayBg, loadedIndependenceDayBg, loadedIndependenceDayCyclingBg);
+      renderPoster(desktopCanvasRef.current, state, loadedPhoto, loadedCyclingBg, loadedRunWalkBg, isDragging, loadedHalftone, loadedYouthDayBg, loadedIndependenceDayBg, loadedIndependenceDayCyclingBg, loadedSportsDayBg);
     }
     if (mobileCanvasRef.current) {
-      renderPoster(mobileCanvasRef.current, state, loadedPhoto, loadedCyclingBg, loadedRunWalkBg, isDragging, loadedHalftone, loadedYouthDayBg, loadedIndependenceDayBg, loadedIndependenceDayCyclingBg);
+      renderPoster(mobileCanvasRef.current, state, loadedPhoto, loadedCyclingBg, loadedRunWalkBg, isDragging, loadedHalftone, loadedYouthDayBg, loadedIndependenceDayBg, loadedIndependenceDayCyclingBg, loadedSportsDayBg);
     }
-  }, [state, loadedPhoto, loadedCyclingBg, loadedRunWalkBg, isDragging, mobileStep, isGenerated, loadedHalftone, loadedYouthDayBg, loadedIndependenceDayBg, loadedIndependenceDayCyclingBg]);
+  }, [state, loadedPhoto, loadedCyclingBg, loadedRunWalkBg, isDragging, mobileStep, isGenerated, loadedHalftone, loadedYouthDayBg, loadedIndependenceDayBg, loadedIndependenceDayCyclingBg, loadedSportsDayBg]);
 
   // Hook scroll wheel zooming directly onto canvases to prevent page-level scrolling
   useEffect(() => {
@@ -1026,7 +1039,7 @@ function PosterGenerator() {
           </section>
 
           {/* Card 3: Design Template Variants */}
-          {state.templateId !== 'youth-day' && state.templateId !== 'independence-day' && (
+          {state.templateId !== 'youth-day' && state.templateId !== 'independence-day' && state.templateId !== 'sports-day' && (
             <section className="uber-card p-6 flex flex-col space-y-4">
               <div className="flex items-center space-x-2 border-b border-slate-200 pb-3">
                 <Sliders className="w-5 h-5 text-neutral-900" />
@@ -1034,7 +1047,7 @@ function PosterGenerator() {
               </div>
 
               <div className="grid grid-cols-1 gap-3">
-                {TEMPLATES.filter(tpl => tpl.id !== 'youth-day').map((tpl) => {
+                {TEMPLATES.filter(tpl => tpl.id !== 'youth-day' && tpl.id !== 'sports-day').map((tpl) => {
                   const isActive = state.templateId === tpl.id;
                   return (
                     <button
@@ -1351,11 +1364,11 @@ function PosterGenerator() {
               </div>
 
               {/* Template selector carousel */}
-              {state.templateId !== 'youth-day' && state.templateId !== 'independence-day' && (
+              {state.templateId !== 'youth-day' && state.templateId !== 'independence-day' && state.templateId !== 'sports-day' && (
                 <div className="flex flex-col space-y-1.5">
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Select Poster Template Style</span>
                   <div className="flex space-x-3 overflow-x-auto pb-1 px-1 scroll-smooth snap-x">
-                    {TEMPLATES.filter(tpl => tpl.id !== 'youth-day').map((tpl) => {
+                    {TEMPLATES.filter(tpl => tpl.id !== 'youth-day' && tpl.id !== 'sports-day').map((tpl) => {
                       const isSelected = state.templateId === tpl.id;
                       return (
                         <button
