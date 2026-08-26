@@ -14,6 +14,13 @@
   src: local('Glacial Indifference'), url('https://fonts.cdnfonts.com/s/19355/GlacialIndifference-Bold.woff') format('woff');
 }
 
+@font-face {
+  font-family: 'Recoleta';
+  font-style: normal;
+  font-weight: normal;
+  src: local('Recoleta'), url('https://fonts.cdnfonts.com/s/31694/Recoleta-RegularDEMO.woff') format('woff');
+}
+
 @theme {
   --font-serif-cert: "Cinzel", serif;
   --font-signature: "Dancing Script", cursive;
