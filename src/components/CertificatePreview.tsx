@@ -455,27 +455,29 @@ export const CertificatePreview: React.FC<CertificatePreviewProps> = ({ data, is
               className="absolute text-left flex items-center justify-start" 
               style={{ 
                 left: '165px',
-                top: isGenerating ? '400px' : '420px', 
+                top: isGenerating ? '380px' : '410px', 
                 width: '1000px', 
                 maxWidth: '900px',
                 height: '100px',
                 zIndex: 10 
               }}
             >
-              <div className="inline-block border-b-[4px] border-[#263957]  max-w-full">
+              <div className="inline-block   max-w-full">
                 <h2 
-                  className="font-black tracking-tight text-left"
+                  className="font-black tracking-tight text-left border-b-[4px] border-[#263957]"
                   style={{
-                    ...getNameStyle(data.name || 'YOUR NAME HERE'),
+                    // ...getNameStyle(data.name || 'YOUR NAME HERE'),
                     fontFamily: '"Recoleta", serif',
                     fontWeight: 'bold',
                     WebkitTextStroke: '0.75px #263957',
                     color: '#263957',
                     margin: 0,
                     padding: 0,
-                    lineHeight: '1.05',
+                    fontSize: '64px',
+                    lineHeight: '1.7',
                     textTransform: 'uppercase',
                     whiteSpace: 'nowrap',
+                    
                   }}
                 >
                   {(data.name || '').trim() || 'YOUR NAME HERE'}
