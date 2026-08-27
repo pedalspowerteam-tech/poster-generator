@@ -455,7 +455,7 @@ export const CertificatePreview: React.FC<CertificatePreviewProps> = ({ data, is
               className="absolute text-left flex items-center justify-start" 
               style={{ 
                 left: '165px',
-                top: isGenerating ? '380px' : '410px', 
+                top: isGenerating ? '385px' : '410px', 
                 width: '1000px', 
                 maxWidth: '900px',
                 height: '100px',
@@ -474,7 +474,7 @@ export const CertificatePreview: React.FC<CertificatePreviewProps> = ({ data, is
                     margin: 0,
                     padding: 0,
                     fontSize: '64px',
-                    lineHeight: '1.7',
+                    lineHeight: isGenerating ? '1.8' : '1',
                     textTransform: 'uppercase',
                     whiteSpace: 'nowrap',
                     
