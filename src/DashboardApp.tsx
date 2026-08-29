@@ -18,7 +18,8 @@ import {
   Trash2,
   Plus,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface CertificateLog {
@@ -35,6 +36,16 @@ interface CertificateLog {
   event_name?: string;
   certificate_url?: string;
   completed_distance?: string;
+}
+
+interface PosterLog {
+  id: string;
+  created_at: string;
+  name: string;
+  target: string;
+  poster_url: string;
+  category?: string;
+  event_name?: string;
 }
 
 interface EventSetting {
@@ -276,7 +287,10 @@ export default function DashboardApp() {
   const [authError, setAuthError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // Dashboard Data State
+  // Navigation Tab state
+  const [activeTab, setActiveTab] = useState<'certificates' | 'posters'>('certificates');
+
+  // Certificate Data State
   const [logs, setLogs] = useState<CertificateLog[]>([]);
   const [totalMatchingCount, setTotalMatchingCount] = useState(0);
   const [totalCertificatesCount, setTotalCertificatesCount] = useState(0);
@@ -289,6 +303,16 @@ export default function DashboardApp() {
   const [showPassword, setShowPassword] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
+
+  // Poster Data State
+  const [posterLogs, setPosterLogs] = useState<PosterLog[]>([]);
+  const [totalPostersCount, setTotalPostersCount] = useState(0);
+  const [cyclingPosterCount, setCyclingPosterCount] = useState(0);
+  const [walkRunPosterCount, setWalkRunPosterCount] = useState(0);
+  const [totalMatchingPosterCount, setTotalMatchingPosterCount] = useState(0);
+  const [posterSearchTerm, setPosterSearchTerm] = useState('');
+  const [posterTypeFilter, setPosterTypeFilter] = useState<'all' | 'cycling' | 'walk-running'>('all');
+  const [posterCurrentPage, setPosterCurrentPage] = useState(1);
 
   // Event settings state
   const [eventSettings, setEventSettings] = useState<EventSetting[]>([]);
@@ -314,15 +338,20 @@ export default function DashboardApp() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchStats();
+      fetchPosterStats();
       fetchEventSettings();
     }
   }, [isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchLogs();
+      if (activeTab === 'certificates') {
+        fetchLogs();
+      } else {
+        fetchPosterLogs();
+      }
     }
-  }, [isAuthenticated, currentPage, searchTerm, typeFilter]);
+  }, [isAuthenticated, activeTab, currentPage, searchTerm, typeFilter, posterCurrentPage, posterSearchTerm, posterTypeFilter]);
 
   const fetchStats = async () => {
     try {
@@ -336,6 +365,21 @@ export default function DashboardApp() {
       if (walkRunRes.count !== null) setWalkRunCount(walkRunRes.count);
     } catch (e) {
       console.error('Error fetching stats:', e);
+    }
+  };
+
+  const fetchPosterStats = async () => {
+    try {
+      const [totalRes, cyclingRes, walkRunRes] = await Promise.all([
+        supabase.from('posters').select('*', { count: 'exact', head: true }),
+        supabase.from('posters').select('*', { count: 'exact', head: true }).eq('category', 'cycling'),
+        supabase.from('posters').select('*', { count: 'exact', head: true }).eq('category', 'walk-running'),
+      ]);
+      if (totalRes.count !== null) setTotalPostersCount(totalRes.count);
+      if (cyclingRes.count !== null) setCyclingPosterCount(cyclingRes.count);
+      if (walkRunRes.count !== null) setWalkRunPosterCount(walkRunRes.count);
+    } catch (e) {
+      console.error('Error fetching poster stats:', e);
     }
   };
 
@@ -367,6 +411,39 @@ export default function DashboardApp() {
       if (count !== null) setTotalMatchingCount(count);
     } catch (err) {
       console.error('Error fetching logs:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchPosterLogs = async () => {
+    setIsLoading(true);
+    try {
+      let query = supabase
+        .from('posters')
+        .select('*', { count: 'exact' });
+
+      if (posterTypeFilter !== 'all') {
+        query = query.eq('category', posterTypeFilter);
+      }
+
+      if (posterSearchTerm.trim()) {
+        const term = `%${posterSearchTerm.trim()}%`;
+        query = query.or(`name.ilike.${term},target.ilike.${term},event_name.ilike.${term}`);
+      }
+
+      const from = (posterCurrentPage - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+      setPosterLogs(data || []);
+      if (count !== null) setTotalMatchingPosterCount(count);
+    } catch (err) {
+      console.error('Error fetching poster logs:', err);
     } finally {
       setIsLoading(false);
     }
@@ -631,6 +708,97 @@ export default function DashboardApp() {
     }
   };
 
+  // Poster pagination & search handlers
+  const handlePosterSearchChange = (term: string) => {
+    setPosterSearchTerm(term);
+    setPosterCurrentPage(1);
+  };
+
+  const handlePosterTypeFilterChange = (filter: 'all' | 'cycling' | 'walk-running') => {
+    setPosterTypeFilter(filter);
+    setPosterCurrentPage(1);
+  };
+
+  const totalPosterPages = Math.max(1, Math.ceil(totalMatchingPosterCount / ITEMS_PER_PAGE));
+  const startPosterItem = totalMatchingPosterCount === 0 ? 0 : (posterCurrentPage - 1) * ITEMS_PER_PAGE + 1;
+  const endPosterItem = Math.min(posterCurrentPage * ITEMS_PER_PAGE, totalMatchingPosterCount);
+
+  const getPosterPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    if (totalPosterPages <= 7) {
+      for (let i = 1; i <= totalPosterPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      let start = Math.max(2, posterCurrentPage - 1);
+      let end = Math.min(totalPosterPages - 1, posterCurrentPage + 1);
+
+      if (posterCurrentPage <= 3) {
+        end = 4;
+      } else if (posterCurrentPage >= totalPosterPages - 2) {
+        start = totalPosterPages - 3;
+      }
+
+      if (start > 2) {
+        pages.push('...');
+      }
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      if (end < totalPosterPages - 1) {
+        pages.push('...');
+      }
+
+      pages.push(totalPosterPages);
+    }
+    return pages;
+  };
+
+  const handleExportPosterCSV = async () => {
+    try {
+      let query = supabase.from('posters').select('*');
+      if (posterTypeFilter !== 'all') {
+        query = query.eq('category', posterTypeFilter);
+      }
+      if (posterSearchTerm.trim()) {
+        const term = `%${posterSearchTerm.trim()}%`;
+        query = query.or(`name.ilike.${term},target.ilike.${term},event_name.ilike.${term}`);
+      }
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) throw error;
+      const exportLogs = data || [];
+
+      const headers = ['RECORD ID', 'CREATED AT', 'RECIPIENT NAME', 'TARGET', 'CATEGORY', 'EVENT NAME', 'POSTER URL'];
+
+      const rows = exportLogs.map(log => [
+        log.id,
+        new Date(log.created_at).toLocaleString(),
+        log.name,
+        log.target,
+        log.category || 'cycling',
+        log.event_name || 'N/A',
+        log.poster_url || 'N/A'
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `pedals_power_posters_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error exporting poster CSV:', err);
+    }
+  };
+
   /* ================= AUTHENTICATION LOGIN SCREEN ================= */
   if (!isAuthenticated) {
     return (
@@ -714,16 +882,45 @@ export default function DashboardApp() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#1A2B4C] font-sans flex flex-col" id="dashboard-console">
       {/* Header Panel */}
-      <header className="bg-white border-b-2 border-[#E2E8F0] sticky top-0 z-40 px-6 py-4 flex items-center justify-between" id="dashboard-header">
+      <header className="bg-white border-b-2 border-[#E2E8F0] sticky top-0 z-40 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3" id="dashboard-header">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-[#1A2B4C] flex items-center justify-center font-black text-white text-lg rounded-sm">
             P
           </div>
           <div>
             <h1 className="text-sm sm:text-base font-black uppercase tracking-wider">Pedals Power Admin</h1>
-            <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-widest mt-0.5">Certificates Database Log</p>
+            <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-widest mt-0.5">Certificates & Posters Portal</p>
           </div>
         </div>
+
+        {/* Tab Switcher */}
+        <div className="flex items-center gap-1.5 bg-[#F8FAFC] border-2 border-[#E2E8F0] p-1 rounded-sm">
+          <button
+            type="button"
+            onClick={() => setActiveTab('certificates')}
+            className={`px-3.5 py-1.5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 rounded-sm transition-all cursor-pointer ${
+              activeTab === 'certificates'
+                ? 'bg-[#1A2B4C] text-white shadow-sm'
+                : 'text-[#64748B] hover:text-[#1A2B4C] hover:bg-slate-200/60'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5" />
+            Certificates
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('posters')}
+            className={`px-3.5 py-1.5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 rounded-sm transition-all cursor-pointer ${
+              activeTab === 'posters'
+                ? 'bg-[#1A2B4C] text-white shadow-sm'
+                : 'text-[#64748B] hover:text-[#1A2B4C] hover:bg-slate-200/60'
+            }`}
+          >
+            <ImageIcon className="w-3.5 h-3.5" />
+            Posters
+          </button>
+        </div>
+
         <button
           type="button"
           onClick={handleLogout}
@@ -736,41 +933,275 @@ export default function DashboardApp() {
 
       {/* Main Console Canvas */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        {/* Statistics Banner */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" id="stats-banner">
-          {/* Card 1: Total logs */}
-          <div className="bg-white border-2 border-[#E2E8F0] p-4 rounded-sm flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#64748B]">Total Certificates</p>
-              <h3 className="text-2xl font-black mt-1">{totalCertificatesCount}</h3>
-            </div>
-            <div className="w-10 h-10 bg-[#1A2B4C]/10 text-[#1A2B4C] flex items-center justify-center rounded-sm">
-              <Database className="w-5 h-5" />
-            </div>
-          </div>
+        {activeTab === 'posters' ? (
+          <>
+            {/* Statistics Banner for Posters */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" id="poster-stats-banner">
+              <div className="bg-white border-2 border-[#E2E8F0] p-4 rounded-sm flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-[#64748B]">Total Saved Posters</p>
+                  <h3 className="text-2xl font-black mt-1">{totalPostersCount}</h3>
+                </div>
+                <div className="w-10 h-10 bg-[#1A2B4C]/10 text-[#1A2B4C] flex items-center justify-center rounded-sm">
+                  <Database className="w-5 h-5" />
+                </div>
+              </div>
 
-          {/* Card 2: Cycling logs */}
-          <div className="bg-white border-2 border-[#E2E8F0] p-4 rounded-sm flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#64748B]">Cycling Records</p>
-              <h3 className="text-2xl font-black mt-1">{cyclingCount}</h3>
-            </div>
-            <div className="w-10 h-10 bg-[#C5A059]/10 text-[#C5A059] flex items-center justify-center rounded-sm">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-          </div>
+              <div className="bg-white border-2 border-[#E2E8F0] p-4 rounded-sm flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-[#64748B]">Cycling Posters</p>
+                  <h3 className="text-2xl font-black mt-1">{cyclingPosterCount}</h3>
+                </div>
+                <div className="w-10 h-10 bg-[#C5A059]/10 text-[#C5A059] flex items-center justify-center rounded-sm">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+              </div>
 
-          {/* Card 3: Walk-Run logs */}
-          <div className="bg-white border-2 border-[#E2E8F0] p-4 rounded-sm flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#64748B]">Walk/Running Records</p>
-              <h3 className="text-2xl font-black mt-1">{walkRunCount}</h3>
+              <div className="bg-white border-2 border-[#E2E8F0] p-4 rounded-sm flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-[#64748B]">Walk/Running Posters</p>
+                  <h3 className="text-2xl font-black mt-1">{walkRunPosterCount}</h3>
+                </div>
+                <div className="w-10 h-10 bg-[#1A2B4C]/10 text-[#1A2B4C] flex items-center justify-center rounded-sm">
+                  <Award className="w-5 h-5" />
+                </div>
+              </div>
             </div>
-            <div className="w-10 h-10 bg-[#1A2B4C]/10 text-[#1A2B4C] flex items-center justify-center rounded-sm">
-              <Award className="w-5 h-5" />
+
+            {/* Poster Database Search & Controls */}
+            <div className="bg-white border-2 border-[#E2E8F0] p-4 rounded-sm flex flex-col md:flex-row md:items-center justify-between gap-4" id="poster-db-controls">
+              <div className="flex-1 flex flex-col sm:flex-row gap-3">
+                {/* Search Input */}
+                <div className="flex-1 relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="w-4 h-4 text-slate-400" />
+                  </span>
+                  <input
+                    type="text"
+                    value={posterSearchTerm}
+                    onChange={(e) => handlePosterSearchChange(e.target.value)}
+                    placeholder="SEARCH RECIPIENT, TARGET, OR EVENT..."
+                    className="w-full h-10 pl-9 pr-4 text-xs font-semibold bg-white border-2 border-[#E2E8F0] rounded-sm focus:outline-none focus:border-[#1A2B4C] transition-colors placeholder:text-slate-400 placeholder:font-normal uppercase"
+                  />
+                </div>
+
+                {/* Type Filter Select */}
+                <select
+                  value={posterTypeFilter}
+                  onChange={(e) => handlePosterTypeFilterChange(e.target.value as any)}
+                  className="h-10 px-3 text-xs font-semibold bg-white border-2 border-[#E2E8F0] rounded-sm focus:outline-none focus:border-[#1A2B4C] cursor-pointer"
+                >
+                  <option value="all">ALL CATEGORIES</option>
+                  <option value="cycling">CYCLING ONLY</option>
+                  <option value="walk-running">WALK & RUN ONLY</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchPosterStats();
+                    fetchPosterLogs();
+                  }}
+                  title="Refresh poster logs"
+                  className="h-10 w-10 border-2 border-[#E2E8F0] hover:bg-[#F8FAFC] flex items-center justify-center rounded-sm transition-colors cursor-pointer"
+                >
+                  <RefreshCw className={`w-4 h-4 text-[#1A2B4C] ${isLoading ? 'animate-spin' : ''}`} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportPosterCSV}
+                  disabled={totalMatchingPosterCount === 0}
+                  className={`h-10 px-4 text-xs font-black uppercase tracking-widest rounded-sm border-2 flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    totalMatchingPosterCount > 0
+                      ? 'bg-[#1A2B4C] hover:bg-[#2D4263] border-[#1A2B4C] text-white'
+                      : 'bg-[#F8FAFC] text-[#94A3B8] border-[#E2E8F0] cursor-not-allowed'
+                  }`}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export Posters CSV
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
+
+            {/* Poster Records Table */}
+            <div className="bg-white border-2 border-[#E2E8F0] rounded-sm overflow-hidden" id="poster-records-view">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#F8FAFC] border-b-2 border-[#E2E8F0] text-[9px] font-black uppercase tracking-wider text-[#64748B]">
+                      <th className="p-3 pl-4">Recipient Name</th>
+                      <th className="p-3">Target</th>
+                      <th className="p-3">Category</th>
+                      <th className="p-3">Event Name</th>
+                      <th className="p-3">Poster Preview</th>
+                      <th className="p-3 pr-4">Created At</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E2E8F0] text-xs font-semibold text-[#1A2B4C]">
+                    {isLoading ? (
+                      <tr>
+                        <td colSpan={6} className="p-10 text-center text-[#64748B]">
+                          <RefreshCw className="w-6 h-6 animate-spin mx-auto text-[#94A3B8] mb-2" />
+                          <p className="text-[10px] font-black uppercase tracking-wider">Retrieving poster records...</p>
+                        </td>
+                      </tr>
+                    ) : posterLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-10 text-center text-[#64748B]">
+                          <Database className="w-8 h-8 mx-auto text-[#94A3B8] mb-2 opacity-50" />
+                          <p className="text-[10px] font-black uppercase tracking-wider">No matching poster records found</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      posterLogs.map(log => (
+                        <tr key={log.id} className="hover:bg-[#F8FAFC]/50 transition-colors">
+                          <td className="p-3 pl-4 font-bold uppercase">{log.name}</td>
+                          <td className="p-3 font-mono font-bold text-[#C5A059]">{log.target}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 text-[9px] font-black rounded-sm uppercase tracking-wider border ${
+                              log.category === 'cycling' || !log.category
+                                ? 'bg-[#C5A059]/10 border-[#C5A059]/30 text-[#C5A059]'
+                                : 'bg-[#1A2B4C]/10 border-[#1A2B4C]/30 text-[#1A2B4C]'
+                            }`}>
+                              {log.category || 'cycling'}
+                            </span>
+                          </td>
+                          <td className="p-3 font-mono text-xs text-[#64748B]">
+                            {log.event_name || 'N/A'}
+                          </td>
+                          <td className="p-3">
+                            {log.poster_url ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedImageUrl(log.poster_url)}
+                                className="group relative block overflow-hidden rounded border border-[#E2E8F0] transition hover:border-[#1A2B4C] focus:outline-none cursor-pointer"
+                              >
+                                <img
+                                  src={log.poster_url}
+                                  alt="Poster thumbnail"
+                                  className="h-12 w-12 object-cover transition duration-300 group-hover:scale-105"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                                  <span className="text-[8px] text-white font-black uppercase tracking-wider">VIEW</span>
+                                </div>
+                              </button>
+                            ) : (
+                              <span className="text-slate-400 font-normal italic text-[10px]">N/A</span>
+                            )}
+                          </td>
+                          <td className="p-3 pr-4 font-mono text-[#64748B] text-[10px]">
+                            {new Date(log.created_at).toLocaleString('en-US', { hour12: false })}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Poster Pagination Controls */}
+              {!isLoading && totalMatchingPosterCount > 0 && (
+                <div className="px-4 py-3 bg-[#F8FAFC] border-t-2 border-[#E2E8F0] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-semibold text-[#64748B]">
+                  <div className="font-mono text-[11px] uppercase tracking-wider text-[#64748B]">
+                    Showing <span className="font-bold text-[#1A2B4C]">{startPosterItem}</span> to <span className="font-bold text-[#1A2B4C]">{endPosterItem}</span> of <span className="font-bold text-[#1A2B4C]">{totalMatchingPosterCount}</span> records
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPosterCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={posterCurrentPage === 1}
+                      className={`px-2.5 py-1 rounded-sm border-2 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 transition-colors ${
+                        posterCurrentPage === 1
+                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                          : 'bg-white text-[#1A2B4C] border-[#E2E8F0] hover:bg-[#F8FAFC] hover:border-[#1A2B4C] cursor-pointer'
+                      }`}
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      Prev
+                    </button>
+
+                    <div className="flex items-center gap-1 px-1">
+                      {getPosterPageNumbers().map((page, idx) => (
+                        typeof page === 'number' ? (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setPosterCurrentPage(page)}
+                            className={`w-7 h-7 flex items-center justify-center rounded-sm border-2 text-[10px] font-black transition-colors ${
+                              posterCurrentPage === page
+                                ? 'bg-[#1A2B4C] text-white border-[#1A2B4C]'
+                                : 'bg-white text-[#1A2B4C] border-[#E2E8F0] hover:bg-[#F8FAFC] hover:border-[#1A2B4C] cursor-pointer'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ) : (
+                          <span key={idx} className="px-1 text-slate-400 font-bold text-[10px]">
+                            {page}
+                          </span>
+                        )
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPosterCurrentPage(prev => Math.min(prev + 1, totalPosterPages))}
+                      disabled={posterCurrentPage === totalPosterPages}
+                      className={`px-2.5 py-1 rounded-sm border-2 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 transition-colors ${
+                        posterCurrentPage === totalPosterPages
+                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                          : 'bg-white text-[#1A2B4C] border-[#E2E8F0] hover:bg-[#F8FAFC] hover:border-[#1A2B4C] cursor-pointer'
+                      }`}
+                    >
+                      Next
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Statistics Banner */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" id="stats-banner">
+              {/* Card 1: Total logs */}
+              <div className="bg-white border-2 border-[#E2E8F0] p-4 rounded-sm flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-[#64748B]">Total Certificates</p>
+                  <h3 className="text-2xl font-black mt-1">{totalCertificatesCount}</h3>
+                </div>
+                <div className="w-10 h-10 bg-[#1A2B4C]/10 text-[#1A2B4C] flex items-center justify-center rounded-sm">
+                  <Database className="w-5 h-5" />
+                </div>
+              </div>
+
+              {/* Card 2: Cycling logs */}
+              <div className="bg-white border-2 border-[#E2E8F0] p-4 rounded-sm flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-[#64748B]">Cycling Records</p>
+                  <h3 className="text-2xl font-black mt-1">{cyclingCount}</h3>
+                </div>
+                <div className="w-10 h-10 bg-[#C5A059]/10 text-[#C5A059] flex items-center justify-center rounded-sm">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+              </div>
+
+              {/* Card 3: Walk-Run logs */}
+              <div className="bg-white border-2 border-[#E2E8F0] p-4 rounded-sm flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-[#64748B]">Walk/Running Records</p>
+                  <h3 className="text-2xl font-black mt-1">{walkRunCount}</h3>
+                </div>
+                <div className="w-10 h-10 bg-[#1A2B4C]/10 text-[#1A2B4C] flex items-center justify-center rounded-sm">
+                  <Award className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
 
         {/* Event Release Restrictions Settings Panel */}
         <div className="bg-white border-2 border-[#E2E8F0] p-4 sm:p-6 rounded-sm space-y-4" id="event-restrictions-settings">
@@ -1162,7 +1593,9 @@ export default function DashboardApp() {
             </div>
           )}
         </div>
-      </main>
+      </>
+    )}
+  </main>
 
       {/* Lightbox Modal Previewer */}
       {selectedImageUrl && (

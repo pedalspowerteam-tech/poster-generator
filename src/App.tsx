@@ -39,6 +39,7 @@ import runWalkBg from '../assets/run_walk_bg.jpg';
 import halftoneCircle from '../assets/halftone_circle.png';
 import CertificateApp from './CertificateApp';
 import DashboardApp from './DashboardApp';
+import { supabase } from './supabaseClient';
 // @ts-ignore
 import baackgroundimg from '../assets/baackgroundimg.png';
 // @ts-ignore
@@ -776,6 +777,74 @@ function PosterGenerator() {
     return mobileCanvasRef.current || desktopCanvasRef.current;
   };
 
+  // Upload poster image to Cloudflare R2
+  const uploadPosterToR2 = async (canvas: HTMLCanvasElement): Promise<string | null> => {
+    const uploadApi = import.meta.env.VITE_R2_UPLOAD_API;
+    if (!uploadApi) {
+      console.warn('VITE_R2_UPLOAD_API is not configured. Skipping poster image Cloudflare R2 upload.');
+      return null;
+    }
+
+    try {
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, 'image/png');
+      });
+
+      if (!blob) {
+        console.error('Failed to convert poster canvas to image blob');
+        return null;
+      }
+
+      const formData = new FormData();
+      formData.append('file', blob, `poster_${Date.now()}.png`);
+
+      const uploadUrl = new URL(uploadApi);
+      uploadUrl.searchParams.set('type', 'posters');
+
+      const response = await fetch(uploadUrl.toString(), {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed with server status ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result.url || null;
+    } catch (err) {
+      console.error('Error uploading poster to R2:', err);
+      return null;
+    }
+  };
+
+  // Save poster record to Supabase database (name, target, poster_url, category, event_name)
+  const savePosterToBackend = async (name: string, target: string, posterUrl: string | null) => {
+    if (!posterUrl) return;
+    try {
+      const path = typeof window !== 'undefined' ? window.location.pathname : '';
+      const category = path.includes('/walk-runing') ? 'walk-running' : 'cycling';
+
+      const search = typeof window !== 'undefined' ? window.location.search : '';
+      const eventName = new URLSearchParams(search).get('event') || 'N/A';
+
+      const { error } = await supabase
+        .from('posters')
+        .insert({
+          name: name.trim(),
+          target: target.trim(),
+          poster_url: posterUrl,
+          category: category,
+          event_name: eventName,
+        });
+
+      if (error) throw error;
+      console.log('Poster record saved to database successfully!');
+    } catch (err) {
+      console.error('Failed to log poster record to database:', err);
+    }
+  };
+
   // File Download action
   const handleDownload = () => {
     const canvas = getActiveCanvas();
@@ -791,6 +860,16 @@ function PosterGenerator() {
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(url), 100);
     }, 'image/png');
+
+    // Trigger Cloudflare R2 upload & Supabase database log asynchronously on download
+    (async () => {
+      try {
+        const uploadedUrl = await uploadPosterToR2(canvas);
+        await savePosterToBackend(state.name, state.target, uploadedUrl);
+      } catch (err) {
+        console.error('Background poster upload/save failed:', err);
+      }
+    })();
   };
 
   // Web Share API support or download fallback
