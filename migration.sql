@@ -35,3 +35,37 @@ VALUES
   ('youth-day', 'International Youth Day Virtual Challenge', NULL),
   ('independence-day', 'Independence Day Virtual Challenge', NULL)
 ON CONFLICT (event_id) DO NOTHING;
+
+-- SQL Script to set up posters table in Supabase
+CREATE TABLE IF NOT EXISTS posters (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  target VARCHAR(255) NOT NULL,
+  poster_url TEXT NOT NULL,
+  category VARCHAR(255) DEFAULT 'cycling',
+  event_name VARCHAR(255) DEFAULT 'N/A',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Alter table if existing from previous creation
+ALTER TABLE posters ADD COLUMN IF NOT EXISTS category VARCHAR(255) DEFAULT 'cycling';
+ALTER TABLE posters ADD COLUMN IF NOT EXISTS event_name VARCHAR(255) DEFAULT 'N/A';
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE posters ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read access
+CREATE POLICY "Allow public reads on posters" ON posters
+  FOR SELECT TO public USING (true);
+
+-- Allow public inserts
+CREATE POLICY "Allow public inserts on posters" ON posters
+  FOR INSERT TO public WITH CHECK (true);
+
+-- Allow public updates
+CREATE POLICY "Allow public updates on posters" ON posters
+  FOR UPDATE TO public USING (true) WITH CHECK (true);
+
+-- Allow public deletes
+CREATE POLICY "Allow public deletes on posters" ON posters
+  FOR DELETE TO public USING (true);
