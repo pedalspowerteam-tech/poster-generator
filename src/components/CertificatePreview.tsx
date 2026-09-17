@@ -19,7 +19,6 @@ import certSportsDayBg from '../../assets/cert_sports_day_bg.svg';
 // @ts-ignore
 import certPeaceDayBg from '../../assets/cert_peace_day_bg.png';
 
-
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
