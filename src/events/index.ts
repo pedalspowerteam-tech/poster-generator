@@ -2,6 +2,7 @@ import { template as morningRide } from './morning-ride/template';
 import { template as youthDay } from './youth-day/template';
 import { template as independenceDay } from './independence-day/template';
 import { template as sportsDay } from './sports-day/template';
+import { template as peaceDay } from './peace-day/template';
 import { TemplateConfig } from '../types';
 
 export const TEMPLATES: TemplateConfig[] = [
@@ -9,6 +10,7 @@ export const TEMPLATES: TemplateConfig[] = [
   youthDay,
   independenceDay,
   sportsDay,
+  peaceDay,
 ];
 
 export function getTemplateForEvent(eventName: string): TemplateConfig | null {
@@ -22,9 +24,13 @@ export function getTemplateForEvent(eventName: string): TemplateConfig | null {
   if (norm === 'sports-day' || norm === 'sports_day') {
     return sportsDay;
   }
+  if (norm === 'peace-day' || norm === 'peace_day') {
+    return peaceDay;
+  }
   if (norm) {
     return morningRide;
   }
   return null;
 }
+
 

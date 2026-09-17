@@ -16,6 +16,9 @@ import certIndependenceDayBg from '../../assets/cert_independence_day_bg.svg';
 import certIndependenceDayCyclingBg from '../../assets/cert_independence_day_cycling_bg.svg';
 // @ts-ignore
 import certSportsDayBg from '../../assets/cert_sports_day_bg.svg';
+// @ts-ignore
+import certPeaceDayBg from '../../assets/cert_peace_day_bg.png';
+
 
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '';
@@ -99,6 +102,14 @@ export const CertificatePreview: React.FC<CertificatePreviewProps> = ({ data, is
 
   // Font size logic for recipient's name (different for Youth Day / Independence Day / Sports Day vs others)
   const getNameStyle = (nameText: string): React.CSSProperties => {
+    if (data.selectedTemplateId === 'peace-day') {
+      const len = nameText.length || 1;
+      const calculatedSize = len <= 24 ? 64 : Math.max(38, Math.min(55, 1700 / len));
+      return {
+        fontSize: `${calculatedSize}px`,
+        color: '#01361e',
+      };
+    }
     if (data.selectedTemplateId === 'sports-day') {
       const len = nameText.length || 1;
       // const calculatedSize = len <= 24 ? 64 : Math.max(53, Math.min(56, 1020 / len));
@@ -511,6 +522,90 @@ export const CertificatePreview: React.FC<CertificatePreviewProps> = ({ data, is
               }}
             >
               <span className="text-[28px] font-bold tracking-normal text-[#263957]" style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>
+                {displayCompletedDistance()}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (data.selectedTemplateId === 'peace-day') {
+    return (
+      <div 
+        ref={containerRef} 
+        className="w-full flex items-start justify-start select-none" 
+        style={isGenerating ? { width: '1414px', minWidth: '1414px' } : undefined}
+        id="cert-preview-wrapper"
+      >
+        <div style={wrapperStyle} className="transition-all duration-200">
+          <div style={innerStyle} className="bg-white relative shadow-none" id="certificate-print-area">
+            {/* Background Image */}
+            <div className="absolute inset-0 w-full h-full" style={{ zIndex: 0 }}>
+              <img 
+                src={certPeaceDayBg} 
+                alt="Certificate Background" 
+                className="w-full h-full object-cover" 
+                style={{ width: '1414px', height: '970px', maxWidth: 'none', maxHeight: 'none' }}
+                width="1414" 
+                height="970" 
+              />
+            </div>
+
+            {/* Recipient Name */}
+            <div 
+              className="absolute left-1/2 -translate-x-1/2 text-center flex items-center justify-center" 
+              style={{ 
+                top: isGenerating ? '410px' : '438px', 
+                width: '1200px', 
+                height: '90px',
+                zIndex: 10 
+              }}
+            >
+              <h2 
+                className="font-medium tracking-normal text-center"
+                style={{
+                  ...getNameStyle(data.name || 'YOUR NAME HERE'),
+                  fontFamily: '"Poppins", "Inter", sans-serif',
+                  fontWeight: 500,
+                  color: '#01361e',
+                  letterSpacing: '0.02em',
+                  margin: 0,
+                  padding: 0,
+                  lineHeight: '1.05'
+                }}
+              >
+                {(data.name || '').trim() || 'YOUR NAME HERE'}
+              </h2>
+            </div>
+
+            {/* Duration Stat (placed above the line) */}
+            <div 
+              className="absolute text-center" 
+              style={{ 
+                left: '205px', 
+                top: isGenerating ? '685px' : '702px', 
+                width: '260px', 
+                zIndex: 10 
+              }}
+            >
+              <span className="text-[28px] font-medium tracking-normal text-[#01361e]" style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500 }}>
+                {data.duration || '00:00:00'}
+              </span>
+            </div>
+
+            {/* Distance Stat (placed above the line) */}
+            <div 
+              className="absolute text-center" 
+              style={{ 
+                left: '935px', 
+                top: isGenerating ? '685px' : '702px', 
+                width: '260px', 
+                zIndex: 10 
+              }}
+            >
+              <span className="text-[28px] font-medium tracking-normal text-[#01361e]" style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500 }}>
                 {displayCompletedDistance()}
               </span>
             </div>
